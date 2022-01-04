@@ -112,7 +112,7 @@ def load_param(combinations):
     fields_el=['index',id_dwell,'E_PV','Price_flat','Price_DT','Price_flat_mod','Price_DT_mod','Export_price']
     if combinations['country']=='CH':
         Capacity_tariff=9.39*12/365
-        filename=Path("../Input/IRES_CH_all.csv")
+        filename=Path("../../Input/IRES_CH_all2.csv")
         df = pd.read_csv(filename,engine='python',sep=',|;',index_col=[0],
                             parse_dates=[0],infer_datetime_format=True, usecols=fields_el)
         if np.issubdtype(df.index.dtype, np.datetime64):
@@ -124,7 +124,7 @@ def load_param(combinations):
         
     elif combinations['country']=='US':
         Capacity_tariff=10.14*12/365
-        filename=Path("../Input/IRES_US_all.csv")
+        filename=Path("../../Input/IRES_US_all.csv")
         df = pd.read_csv(filename,engine='python',sep=',|;',index_col=[0],
                             parse_dates=[0],infer_datetime_format=True, usecols=fields_el)
         if np.issubdtype(df.index.dtype, np.datetime64):
@@ -230,8 +230,8 @@ def main():
 
     try:
 
-        filename=Path('../Output/aggregated_results.csv')
-        if 'aggregated_results.csv' in os.listdir('../Output/'):
+        filename=Path('../../Output/aggregated_results.csv')
+        if 'aggregated_results.csv' in os.listdir('../../Output/'):
             df_done=pd.read_csv(filename,sep=';|,',engine='python',index_col=None).drop_duplicates()
             aux=df_done.groupby([df_done.App_comb,df_done.Tech,df_done.name,df_done.country,df_done.cases]).size().reset_index()
         else:

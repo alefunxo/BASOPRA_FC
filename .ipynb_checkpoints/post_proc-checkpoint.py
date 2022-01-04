@@ -24,7 +24,7 @@ import numpy as np
 import itertools
 
 def get_table_inputs():
-    clusters=pd.read_csv('../Input/clusters.csv',index_col=[0])
+    clusters=pd.read_csv('../../Input/clusters.csv',index_col=[0])
     aux=pd.DataFrame()
 
     for i in range(9):
