@@ -26,7 +26,7 @@ import itertools
 def get_table_inputs():
     clusters=pd.read_csv('../../Input/clusters.csv',index_col=[0])
     aux=pd.DataFrame()
-
+    print('inside table 2')
     for i in range(9):
             aux=aux.append(clusters.loc[(clusters.country=='CH')&(clusters.cluster==i)][:(min(30,clusters.loc[(clusters.country=='CH')&(clusters.cluster==i),'name'].size))])
 
@@ -38,14 +38,15 @@ def get_table_inputs():
         {'PV':4.8,'quartile':50,'country':'CH'},
         {'PV':6.9,'quartile':75,'country':'CH'}]
     PV=pd.DataFrame(PV)
+    
 
-
-    App_comb_scenarios=np.array([i for i in itertools.product([False, True],repeat=3)])
-    App_comb_scenarios=np.insert(App_comb_scenarios,slice(1,2),True,axis=1)
+    App_comb_scenarios=np.array([i for i in itertools.product([False, True],repeat=4)])
+    App_comb_scenarios=np.insert(App_comb_scenarios,slice(2,3),True,axis=1)
     App_comb=pd.DataFrame(App_comb_scenarios)
     App_comb=App_comb[0].map(str)+' '+App_comb[1].map(str)+' '+App_comb[2].map(
-                    str)+' '+App_comb[3].map(str)
+                    str)+' '+App_comb[3].map(str)+' '+App_comb[4].map(str)
     App_comb=App_comb.reset_index()
+
     App_comb=App_comb.rename(columns={'index':'App_index',0:'App_comb'})
     conf_scenarios=np.array([i for i in itertools.product([False, True],repeat=3)])
     conf_scenarios=np.insert(conf_scenarios,slice(1,2),True,axis=1)
@@ -54,13 +55,52 @@ def get_table_inputs():
                     str)+' '+conf[3].map(str)
     conf=conf.reset_index()
     conf=conf.rename(columns={'index':'conf_index',0:'conf'})
-
+    
     house_types=pd.DataFrame(np.array(['SFH100','SFH45','SFH15']),columns=['House_type'])
     hp_types=pd.DataFrame(np.array(['GSHP','ASHP']),columns=['HP_type'])
     rad_types=pd.DataFrame(np.array(['under','rad']),columns=['Rad_type'])
     aux=aux.rename(columns={'name':'hh'}).reset_index()
-    return[aux,PV,App_comb]
+    print('Appcomb inside table 2')
+    print(App_comb)
+    return[aux,PV,App_comb]    
 
+# def get_table_inputs():
+#     clusters=pd.read_csv('../../Input/clusters.csv',index_col=[0])
+#     aux=pd.DataFrame()
+
+#     for i in range(9):
+#             aux=aux.append(clusters.loc[(clusters.country=='CH')&(clusters.cluster==i)][:(min(30,clusters.loc[(clusters.country=='CH')&(clusters.cluster==i),'name'].size))])
+
+
+#     PV=[{'PV':3.2,'quartile':25,'country':'US'},
+#         {'PV':5,'quartile':50,'country':'US'},
+#         {'PV':6.4,'quartile':75,'country':'US'},
+#         {'PV':3.2,'quartile':25,'country':'CH'},
+#         {'PV':4.8,'quartile':50,'country':'CH'},
+#         {'PV':6.9,'quartile':75,'country':'CH'}]
+#     PV=pd.DataFrame(PV)
+
+
+#     App_comb_scenarios=np.array([i for i in itertools.product([False, True],repeat=3)])
+#     App_comb_scenarios=np.insert(App_comb_scenarios,slice(1,2),True,axis=1)
+#     App_comb=pd.DataFrame(App_comb_scenarios)
+#     App_comb=App_comb[0].map(str)+' '+App_comb[1].map(str)+' '+App_comb[2].map(
+#                     str)+' '+App_comb[3].map(str)
+#     App_comb=App_comb.reset_index()
+#     App_comb=App_comb.rename(columns={'index':'App_index',0:'App_comb'})
+#     conf_scenarios=np.array([i for i in itertools.product([False, True],repeat=3)])
+#     conf_scenarios=np.insert(conf_scenarios,slice(1,2),True,axis=1)
+#     conf=pd.DataFrame(conf_scenarios)
+#     conf=conf[0].map(str)+' '+conf[1].map(str)+' '+conf[2].map(
+#                     str)+' '+conf[3].map(str)
+#     conf=conf.reset_index()
+#     conf=conf.rename(columns={'index':'conf_index',0:'conf'})
+
+#     house_types=pd.DataFrame(np.array(['SFH100','SFH45','SFH15']),columns=['House_type'])
+#     hp_types=pd.DataFrame(np.array(['GSHP','ASHP']),columns=['HP_type'])
+#     rad_types=pd.DataFrame(np.array(['under','rad']),columns=['Rad_type'])
+#     aux=aux.rename(columns={'name':'hh'}).reset_index()
+#     return[aux,PV,App_comb]
 def get_table_inputs2():
     dwellings_US=np.array(['79', '466', '1', '539', '161', '122', '325', '327',
                     '538','403', '204', '164'])
@@ -90,10 +130,9 @@ def get_table_inputs2():
     clusters.hh=clusters.hh.astype(float)
     return[clusters,PV,App_comb]
 
-def get_base_prices(country,App_comb,PV_nom,df_base,df_batt):
+def get_base_prices(country,App_comb,PV_nom,df_base,df_batt,dt,curtailment):
     print("Base Prices")
-    curtailment=0.5
-    dt=0.25
+    
     if country=='US':
         Capacity_tariff=10.14
     else:
@@ -101,22 +140,22 @@ def get_base_prices(country,App_comb,PV_nom,df_base,df_batt):
     df_base['rem_load']=(df_base.loc[:,'E_demand']-df_base.loc[:,'E_PV'])
     df_base['surplus']=-df_base['rem_load']
     df_base.rem_load[df_base.rem_load<0]=0
-    df_base.surplus[df_base.surplus>PV_nom/(4*1.2)]=PV_nom/(4*1.2)
+    df_base.surplus[df_base.surplus>PV_nom/(1/dt*1.2)]=PV_nom/(1/dt*1.2)
     df_base.surplus[df_base.surplus<0]=0
     df_base['curt']=df_base.E_PV*0
     bill_power=0
     bill_power_PV=0
     bill_power_batt=0
-    if App_comb[0]:
+    if App_comb[1]:
         df_base.curt[df_base.surplus>PV_nom*curtailment*dt]=df_base.surplus[df_base.surplus>PV_nom*curtailment*dt]-PV_nom*curtailment*dt
         df_base.curt[df_base.curt<0]=0
-    if App_comb[3]:
+    if App_comb[4]:
         
-        P_max_month_PV=df_base.groupby([df_base.index.month]).max().loc[:,['rem_load','surplus']].max(axis=1)*4       
+        P_max_month_PV=df_base.groupby([df_base.index.month]).max().loc[:,['rem_load','surplus']].max(axis=1)/dt       
         bill_power_PV=P_max_month_PV*Capacity_tariff
-        P_max_month=df_base.groupby([df_base.index.month]).E_demand.max()*4
+        P_max_month=df_base.groupby([df_base.index.month]).E_demand.max()/dt
         bill_power=P_max_month_PV*Capacity_tariff
-        P_max_month_batt=df_batt.groupby([df_batt.index.month]).max().loc[:,['E_cons','E_PV_grid']].max(axis=1)*4
+        P_max_month_batt=df_batt.groupby([df_batt.index.month]).max().loc[:,['E_cons','E_PV_grid']].max(axis=1)/dt
         bill_power_batt=P_max_month_batt*Capacity_tariff
 
 
@@ -150,7 +189,8 @@ def get_main_results(dict_res,clusters,PV,App):
     We want to know %PS,%LS,%CU,%PVSC per year.
     """
     print('Main results')
-    
+    dt=dict_res['delta_t']
+    curtailment=dict_res['Curtailment']
     df=dict_res['df']
     #print(df)
 
@@ -172,9 +212,9 @@ def get_main_results(dict_res,clusters,PV,App):
 
     agg_results['last_SOH']=dict_res['SOH'][-1]
     agg_results['P_max_year_batt']=dict_res['P_max'].max()
-    agg_results['P_max_year_nbatt']=df['E_demand'].max()*4
-    agg_results['P_drained_max']=df['E_cons'].max()*4
-    agg_results['P_injected_max']=df['E_PV_grid'].max()*4
+    agg_results['P_max_year_nbatt']=df['E_demand'].max()/dt
+    agg_results['P_drained_max']=df['E_cons'].max()/dt
+    agg_results['P_injected_max']=df['E_PV_grid'].max()/dt
     
     if isinstance(dict_res['App_comb'], np.ndarray):
         print('is np')
@@ -199,7 +239,7 @@ def get_main_results(dict_res,clusters,PV,App):
                (PV.country==dict_res['name'].split('_')[1])].quartile.values
    
     df_base=df.loc[:,['E_demand','E_PV','Export_price','price']]
-    [base_bill,base_bill_PV,bill_batt]=get_base_prices(dict_res['name'].split('_')[1],dict_res['App_comb'],dict_res['PV_nom'],df_base,df.loc[:,['E_PV_grid','E_cons','price','Export_price']])
+    [base_bill,base_bill_PV,bill_batt]=get_base_prices(dict_res['name'].split('_')[1],dict_res['App_comb'],dict_res['PV_nom'],df_base,df.loc[:,['E_PV_grid','E_cons','price','Export_price']],dt,curtailment)
 
     agg_results['results_PVbatt']=bill_batt.sum()
     agg_results['results_PV']=base_bill_PV.sum()

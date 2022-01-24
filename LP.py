@@ -50,11 +50,11 @@ def Concrete_model(Data):
 
     #Parameters
     m.dt=en.Param(initialize=Data['delta_t'])
-
-    m.PVAC=en.Param(initialize=Data['App_comb_mod'][0])
-    m.PVSC=en.Param(initialize=Data['App_comb_mod'][1])
-    m.DLS=en.Param(initialize=Data['App_comb_mod'][2])
-    m.DPS=en.Param(initialize=Data['App_comb_mod'][3])
+    m.FC=en.Param(initialize=Data['App_comb_mod'][0])
+    m.PVAC=en.Param(initialize=Data['App_comb_mod'][1])
+    m.PVSC=en.Param(initialize=Data['App_comb_mod'][2])
+    m.DLS=en.Param(initialize=Data['App_comb_mod'][3])
+    m.DPS=en.Param(initialize=Data['App_comb_mod'][4])
 
     m.retail_price=en.Param(m.Time,initialize=Data['retail_price'])
     m.E_PV=en.Param(m.Time,initialize=Data['E_PV'])

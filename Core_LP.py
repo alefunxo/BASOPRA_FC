@@ -154,13 +154,13 @@ def Optimize(data_input,param):
             aux_SOC_max=SOC_max_
             SOH=SOH_aux
         data_input_=data_input[data_input.index.dayofyear==data_input.index.dayofyear[0]+i]
-        if param['App_comb'][2]==True:
-            if param['App_comb'][3]==True:
+        if param['App_comb'][3]==True:#DLS
+            if param['App_comb'][4]==True:#DPS
                 retail_price_dict=dict(enumerate(data_input_.Price_DT_mod))
             else:
                 retail_price_dict=dict(enumerate(data_input_.Price_DT))
         else:
-            if param['App_comb'][3]==True:
+            if param['App_comb'][4]==True:
                 retail_price_dict=dict(enumerate(data_input_.Price_flat_mod))
             else:
                 retail_price_dict=dict(enumerate(data_input_.Price_flat))
@@ -250,15 +250,15 @@ def Optimize(data_input,param):
             return (None,None,None,None,None,None,None,None,results)
     end_d=df.shape[0]
     df=pd.concat([df,data_input.loc[data_input.index[:end_d],['E_demand','E_PV','Export_price']].reset_index()],axis=1)
-    if param['App_comb'][2]==True:
-        if param['App_comb'][3]==True:
+    if param['App_comb'][3]==True:#DLS
+        if param['App_comb'][4]==True:#DPS
             print('App2 and App 3')
             df['price']=data_input.Price_DT_mod.reset_index(drop=True)[:end_d].values
         else:
             print('App2')
             df['price']=data_input.Price_DT.reset_index(drop=True)[:end_d].values
     else:
-        if param['App_comb'][3]==True:
+        if param['App_comb'][4]==True:
             print('App3')
             df['price']=data_input.Price_flat_mod.reset_index(drop=True)[:end_d].values
         else:
@@ -405,7 +405,7 @@ def aggregate_results(df,aux_dict,param):
         param['results']=param.pop('results_arr')
         App_comb=param['App_comb']
         col = ["%i" % x for x in App_comb]
-        name_comb=col[0]+col[1]+col[2]+col[3]
+        name_comb=col[0]+col[1]+col[2]+col[3]+col[4]
         col2 = ["%i" % x for x in param['conf']]
 
         name_conf=col2[0]+col2[1]+col2[2]+col2[3]
@@ -417,7 +417,7 @@ def aggregate_results(df,aux_dict,param):
             continue
         global_lock.acquire()
         #Should be saved in a DB
-        filename='../Output/aggregated_results.csv'
+        filename='../../Output/aggregated_results.csv'
         print('Inside agg_results')
         with open(filename, 'a', newline='') as f:
             writer = csv.writer(f, delimiter=';')
@@ -462,10 +462,10 @@ def save_results(df,aux_dict,param):
         True if successful, False otherwise.
     '''
     try:
-        
+        print('saving results')
         App_comb=param['App_comb']
         col = ["%i" % x for x in App_comb]
-        name_comb=col[0]+col[1]+col[2]+col[3]
+        name_comb=col[0]+col[1]+col[2]+col[3]+col[4]
         col2 = ["%i" % x for x in param['conf']]
         name_conf=col2[0]+col2[1]+col2[2]+col2[3]
         print('after')
