@@ -60,8 +60,7 @@ def get_table_inputs():
     hp_types=pd.DataFrame(np.array(['GSHP','ASHP']),columns=['HP_type'])
     rad_types=pd.DataFrame(np.array(['under','rad']),columns=['Rad_type'])
     aux=aux.rename(columns={'name':'hh'}).reset_index()
-    print('Appcomb inside table 2')
-    print(App_comb)
+    
     return[aux,PV,App_comb]    
 
 # def get_table_inputs():
