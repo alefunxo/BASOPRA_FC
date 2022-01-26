@@ -59,6 +59,10 @@ def Concrete_model(Data):
     m.retail_price=en.Param(m.Time,initialize=Data['retail_price'])
     m.E_PV=en.Param(m.Time,initialize=Data['E_PV'])
     m.E_demand=en.Param(m.Time,initialize=Data['E_demand'])
+    m.FC_price_up=en.Param(m.Time,initialize=Data['FC_price_up'])
+    m.FC_price_down=en.Param(m.Time,initialize=Data['FC_price_down'])
+    
+
 
     m.export_price=en.Param(m.Time,initialize=Data['Export_price'])
     m.capacity_tariff=en.Param(default=Data['Capacity_tariff'])
@@ -68,47 +72,79 @@ def Concrete_model(Data):
 
     m.Max_injection=en.Param(initialize=Data['Max_inj'])
     m.SOC_init=en.Param(initialize=Data['Batt'].SOC_min)
-    m.SOC_min=en.Param(initialize=Data['Batt'].SOC_min)
-    m.SOC_max=en.Param(initialize=Data['SOC_max'])
     m.Efficiency=en.Param(initialize=Data['Batt'].Efficiency)
-    m.Batt_dis_max=en.Param(initialize=-Data['Batt'].P_max_dis)
-    m.Batt_char_max=en.Param(initialize=Data['Batt'].P_max_char)
+    
 
     #FC_related Parameters
     m.FC_div=en.Param(initialize=Data['FC_div'])
+    m.SOC_min_FC=en.Param(initialize=Data['Batt'].SOC_min)
+    m.SOC_max_FC=en.Param(initialize=Data['SOC_max']*m.FC_div)
+    m.Batt_dis_max_FC=en.Param(initialize=-Data['Batt'].P_max_dis*m.FC_div)
+    m.Batt_char_max_FC=en.Param(initialize=Data['Batt'].P_max_char*m.FC_div)
+    
+    m.SOC_min=en.Param(initialize=Data['Batt'].SOC_min)
+    m.SOC_max=en.Param(initialize=Data['SOC_max']*(1-m.FC_div))
+    m.Batt_dis_max=en.Param(initialize=-Data['Batt'].P_max_dis*(1-m.FC_div))
+    m.Batt_char_max=en.Param(initialize=Data['Batt'].P_max_char*(1-m.FC_div))
     
     #Variables
     m.Bool_inj=en.Var(m.Time,within=en.Boolean)
     m.Bool_cons=en.Var(m.Time,within=en.Boolean,initialize=0)
-    m.Bool_char=en.Var(m.Time,within=en.Boolean)
     
+    m.Bool_char=en.Var(m.Time,within=en.Boolean)
     m.Bool_dis=en.Var(m.Time,within=en.Boolean,initialize=0)
+    
+    m.Bool_inv_out=en.Var(m.Time,within=en.Boolean)#to DC/AC
+    m.Bool_inv_in=en.Var(m.Time,within=en.Boolean,initialize=0)# AC/DC
+    
+    m.Bool_char_FC=en.Var(m.Time,within=en.Boolean)
+    m.Bool_dis_FC=en.Var(m.Time,within=en.Boolean,initialize=0)
+    # treated as two batts, but they cannot charge and discharge @ same time
+    m.Bool_FC_SC_dis=en.Var(m.Time,within=en.Boolean,initialize=0)
+    m.Bool_FC_SC_char=en.Var(m.Time,within=en.Boolean,initialize=0)
+    m.Bool_FC_SC_dis2=en.Var(m.Time,within=en.Boolean,initialize=0)
+    m.Bool_FC_SC_char2=en.Var(m.Time,within=en.Boolean,initialize=0)
+    
     m.E_PV_grid=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_PV_load=en.Var(m.Time,bounds=(0,None),initialize=0)
-    m.E_PV_batt=en.Var(m.Time,bounds=(0,None),initialize=0)
+    m.E_PV_batt=en.Var(m.Time,bounds=(0,m.Batt_char_max*m.dt),initialize=0)
     m.E_PV_curt=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_grid_load=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_grid_batt=en.Var(m.Time,bounds=(0,m.Batt_char_max*m.dt),
                        initialize=0)
+    
+    #m.E_PV_FC=en.Var(m.Time,bounds=(0,None),initialize=0)
+    #m.E_FC_load=en.Var(m.Time,bounds=(0,None),initialize=0)
+    m.E_PV_batt_FC=en.Var(m.Time,bounds=(0,m.Batt_char_max_FC*m.dt),initialize=0)
+    m.E_grid_batt_FC=en.Var(m.Time,bounds=(0,m.Batt_char_max_FC*m.dt),
+                       initialize=0)
+#     m.E_FC_batt=en.Var(m.Time,bounds=(0,m.Batt_char_max_FC*m.dt),
+#                        initialize=0)
+    m.E_batt_FC=en.Var(m.Time,bounds=(0,m.Batt_dis_max_FC*m.dt),
+                       initialize=0)
 
     m.E_loss_Batt=en.Var(m.Time,bounds=(0,None),initialize=0)
-
+    m.E_loss_Batt_FC=en.Var(m.Time,bounds=(0,None),initialize=0)
+    #m.E_FC_downwards=en.Var(m.Time,bounds=(0,None),initialize=0)#downwards FC decreases generation
+    #m.E_FC_upwards=en.Var(m.Time,bounds=(0,None),initialize=0)#upwards FC increases generation
     m.E_cons=en.Var(m.Time,bounds=(0,None),initialize=0)
 
-    m.E_char=en.Var(m.Time,bounds=(0,None))
-    m.E_dis=en.Var(m.Time,bounds=(0,None))
+    m.E_char=en.Var(m.Time,bounds=(0,m.Batt_char_max*m.dt))
+    m.E_dis=en.Var(m.Time,bounds=(0,m.Batt_dis_max*m.dt))
+    
+    m.E_char_FC=en.Var(m.Time,bounds=(0,m.Batt_char_max_FC*m.dt))
+    m.E_dis_FC=en.Var(m.Time,bounds=(0,m.Batt_dis_max_FC*m.dt))
+    
     m.P_max_day=en.Var(initialize=0)
+    
     m.SOC=en.Var(m.tm,bounds=(m.SOC_min,m.SOC_max),initialize=m.SOC_min)
-
+    m.SOC_FC=en.Var(m.tm,bounds=(m.SOC_min,m.SOC_max_FC),initialize=m.SOC_min)
+    m.E_loss_inv_batt_FC=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_loss_conv=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_loss_inv=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_loss_inv_PV=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_loss_inv_batt=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_loss_inv_grid=en.Var(m.Time,bounds=(0,None),initialize=0)
-    
-    #FC_related Variables
-    m.SOC_FC=en.Var(m.tm,bounds=(m.SOC_min,m.SOC_max),initialize=m.SOC_min)
-    m.SOC_other=en.Var(m.tm,bounds=(m.SOC_min,m.SOC_max),initialize=m.SOC_min)
     
     #Objective Function
 
@@ -121,8 +157,15 @@ def Concrete_model(Data):
     m.cons_ch2=en.Constraint(m.Time,rule=Bool_cons_rule_2)
     m.cons_ch3=en.Constraint(m.Time,rule=Bool_cons_rule_3)
     m.cons_ch4=en.Constraint(m.Time,rule=Bool_cons_rule_4)
+    
+    m.inv_r=en.Constraint(m.Time,rule=Bool_inv_rule0)
 
-    m.Batt_char_dis=en.Constraint(m.Time,rule=Batt_char_dis)
+    m.inv_ch1=en.Constraint(m.Time,rule=Bool_inv_rule_1)
+    m.inv_ch2=en.Constraint(m.Time,rule=Bool_inv_rule_2)
+    m.inv_ch3=en.Constraint(m.Time,rule=Bool_inv_rule_3)
+    m.inv_ch4=en.Constraint(m.Time,rule=Bool_inv_rule_4)
+
+    m.Batt_char_dis=en.Constraint(m.Time,rule=Batt_char_dis_rule)
     m.Batt_ch1=en.Constraint(m.Time,rule=Bool_char_rule_1)
     m.Batt_ch2=en.Constraint(m.Time,rule=Bool_char_rule_2)
     m.Batt_cd3=en.Constraint(m.Time,rule=Bool_char_rule_3)
@@ -135,7 +178,7 @@ def Concrete_model(Data):
     m.E_dis_r=en.Constraint(m.Time,rule=E_dis_rule)
 
     m.Curtailment_r=en.Constraint(m.Time,rule=Curtailment_rule)
-    m.Sold=en.Constraint(m.Time,rule=Sold_rule)
+    #m.Sold=en.Constraint(m.Time,rule=Sold_rule)# Not sure if this does sth
     m.Inverter=en.Constraint(m.Time,rule=Inverter_rule)
     m.Converter=en.Constraint(m.Time,rule=Converter_rule)
     m.Inverter_grid=en.Constraint(m.Time,rule=Inverter_grid_rule)
@@ -149,21 +192,42 @@ def Concrete_model(Data):
     m.Inv_losses_PV=en.Constraint(m.Time,rule=Inv_losses_PV_rule)
     m.Inv_losses_batt=en.Constraint(m.Time,rule=Inv_losses_Batt_rule)
     m.Inv_losses_grid=en.Constraint(m.Time,rule=Inv_losses_Grid_rule)
-    #m.Batt_max_char=en.Constraint(m.Time,rule=Batt_max_char_rule)
-    #m.Batt_max_dis=en.Constraint(m.Time,rule=Batt_max_dis_rule)
-    #m.SOC_r=en.Constraint(m.Time,rule=SOC_rule)
-    
     #FC_related Constraints
-    # SOC sum
-    # Obj. function
-    # 
     
+    m.Batt_char_dis_FC=en.Constraint(m.Time,rule=Batt_char_dis_FC_rule)
+    m.Batt_char_dis_FC2=en.Constraint(m.Time,rule=Batt_char_dis_FC_rule2)
+    m.Batt_char_dis_FC3=en.Constraint(m.Time,rule=Batt_char_dis_FC_rule3)
+    m.Batt_ch1_FC=en.Constraint(m.Time,rule=Bool_char_rule_1_FC)
+    m.Batt_ch2_FC=en.Constraint(m.Time,rule=Bool_char_rule_2_FC)
+    m.Batt_cd3_FC=en.Constraint(m.Time,rule=Bool_char_rule_3_FC)
+    m.Batt_cd4_FC=en.Constraint(m.Time,rule=Bool_char_rule_4_FC)
+    m.Batt_ch1_FC2=en.Constraint(m.Time,rule=Bool_char_rule_1_FC2)
+    m.Batt_ch2_FC2=en.Constraint(m.Time,rule=Bool_char_rule_2_FC2)
+    m.Batt_cd3_FC2=en.Constraint(m.Time,rule=Bool_char_rule_3_FC2)
+    m.Batt_cd4_FC2=en.Constraint(m.Time,rule=Bool_char_rule_4_FC2)
+    m.Batt_ch1_FC3=en.Constraint(m.Time,rule=Bool_char_rule_1_FC3)
+    m.Batt_ch2_FC3=en.Constraint(m.Time,rule=Bool_char_rule_2_FC3)
+    m.Batt_cd3_FC3=en.Constraint(m.Time,rule=Bool_char_rule_3_FC3)
+    m.Batt_cd4_FC3=en.Constraint(m.Time,rule=Bool_char_rule_4_FC3)
+    m.Batt_SOC_FC=en.Constraint(m.tm,rule=def_storage_state_rule_FC)
+    m.Inv_losses_batt_FC=en.Constraint(m.Time,rule=Inv_losses_Batt_rule_FC)
+    m.Batt_losses_FC=en.Constraint(m.Time,rule=Batt_losses_rule_FC)
+    m.Balance_batt_FC=en.Constraint(m.Time,rule=Balance_Batt_rule_FC)
+    m.E_char_r_FC=en.Constraint(m.Time,rule=E_char_rule_FC)
+    m.E_dis_r_FC=en.Constraint(m.Time,rule=E_dis_rule_FC)
+#     m.FC_ch1=en.Constraint(m.Time,rule=Bool_cons_rule_1_FC)
+#     m.FC_ch2=en.Constraint(m.Time,rule=Bool_cons_rule_2_FC)
+#     m.FC_ch3=en.Constraint(m.Time,rule=Bool_cons_rule_3_FC)
+#     m.FC_ch4=en.Constraint(m.Time,rule=Bool_cons_rule_4_FC)
+#     m.cons_r_FC=en.Constraint(m.Time,rule=Cons_rule_FC)
+#     m.E_FC_downwards_r=en.Constraint(m.Time,rule=E_FC_downwards_rule)
+#     m.E_FC_upwards_r=en.Constraint(m.Time,rule=E_FC_upwards_rule)
     return m
 
 #Instance
-
 #Energy
-#Battery constraints
+
+#Battery constraints (not for FC)
 def Bool_char_rule_1(m,i):
     '''
     Description
@@ -200,7 +264,7 @@ def Bool_char_rule_4(m,i):
     bigM=500000
     return((m.E_char[i])<=0+bigM*(1-m.Bool_dis[i]))
 
-def Batt_char_dis(m,i):
+def Batt_char_dis_rule(m,i):
     '''
     Description
     -------
@@ -233,6 +297,185 @@ def E_dis_rule(m,i):
     '''
     return(m.E_dis[i]<=m.SOC[i-1]-m.SOC_min)
 
+###############################
+
+#Battery constraints for FC
+def Bool_char_rule_1_FC(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 1/5
+    '''
+    bigM=500000
+    return((m.E_dis_FC[i])>=-bigM*(m.Bool_dis_FC[i]))
+
+def Bool_char_rule_2_FC(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 2/5
+    '''
+    bigM=500000
+    return((m.E_dis_FC[i])<=0+bigM*(1-m.Bool_char_FC[i]))
+
+def Bool_char_rule_3_FC(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 3/5
+    '''
+    bigM=500000
+    return((m.E_char_FC[i])>=-bigM*(m.Bool_char_FC[i]))
+
+def Bool_char_rule_4_FC(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 4/5
+    '''
+    bigM=500000
+    return((m.E_char_FC[i])<=0+bigM*(1-m.Bool_dis_FC[i]))
+
+def Batt_char_dis_FC_rule(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 5/5
+    '''
+    return (m.Bool_char_FC[i]+m.Bool_dis_FC[i],1)
+def Bool_char_rule_1_FC2(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 1/5
+    '''
+    bigM=500000
+    return((m.E_dis_FC[i])>=-bigM*(m.Bool_FC_SC_dis[i]))#dis
+
+def Bool_char_rule_2_FC2(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 2/5
+    '''
+    bigM=500000
+    return((m.E_dis_FC[i])<=0+bigM*(1-m.Bool_FC_SC_char[i]))
+
+def Bool_char_rule_3_FC2(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 3/5
+    '''
+    bigM=500000
+    return((m.E_char[i])>=-bigM*(m.Bool_FC_SC_char[i]))
+
+def Bool_char_rule_4_FC2(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 4/5
+    '''
+    bigM=500000
+    return((m.E_char[i])<=0+bigM*(1-m.Bool_FC_SC_dis[i]))
+
+def Batt_char_dis_FC_rule2(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 5/5
+    '''
+    return (m.Bool_FC_SC_dis[i]+m.Bool_FC_SC_char[i],1)
+def Bool_char_rule_1_FC3(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 1/5
+    '''
+    bigM=500000
+    return((m.E_dis[i])>=-bigM*(m.Bool_FC_SC_dis2[i]))#dis
+
+def Bool_char_rule_2_FC3(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 2/5
+    '''
+    bigM=500000
+    return((m.E_dis[i])<=0+bigM*(1-m.Bool_FC_SC_char2[i]))
+
+def Bool_char_rule_3_FC3(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 3/5
+    '''
+    bigM=500000
+    return((m.E_char_FC[i])>=-bigM*(m.Bool_FC_SC_char2[i]))
+
+def Bool_char_rule_4_FC3(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 4/5
+    '''
+    bigM=500000
+    return((m.E_char_FC[i])<=0+bigM*(1-m.Bool_FC_SC_dis2[i]))
+
+def Batt_char_dis_FC_rule3(m,i):
+    '''
+    Description
+    -------
+    Forbids the battery to charge and discharge at the same time 5/5
+    '''
+    return (m.Bool_FC_SC_dis2[i]+m.Bool_FC_SC_char2[i],1)
+def Balance_Batt_rule_FC(m,i):
+    '''
+    Description
+    -------
+    Balance of the battery charge, discharge and efficiency losses.
+    '''
+    return (sum(m.E_char_FC[i]for i in m.Time)
+            -sum(m.E_dis_FC[i]+m.E_loss_Batt_FC[i] for i in m.Time)==0)
+
+def E_char_rule_FC(m,i):
+    '''
+    Description
+    -------
+    Balance of energy charged into the battery from PV and grid.
+    '''
+    return(m.E_char_FC[i],m.E_PV_batt_FC[i]+m.E_grid_batt_FC[i])
+#
+def E_dis_rule_FC(m,i):
+    '''
+    Description
+    -------
+    Sets the maximum energy available to be discharged as the SOC - the minimum SOC.
+    '''
+    return(m.E_dis_FC[i]<=m.SOC_FC[i-1]-m.SOC_min)
+
+def def_storage_state_rule_FC(m, t):
+    '''
+    Description
+    -------
+    State of charge definition as the previous SOC plus charged electricity minus losses minus discharged electricity. Stablishes as well the initial SOC at SOC_min
+    '''
+    if t==-1:
+        return(m.SOC_FC[t],m.SOC_min)
+    else:
+        return (m.SOC_FC[t] ==m.SOC_FC[t-1]+m.E_char_FC[t]-m.E_dis_FC[t]-m.E_loss_Batt_FC[t])
+
+#Energy balance constraints
+
+
+# def E_FC_downwards_rule(m,i):
+#     return((m.E_grid_batt_FC[i]),m.E_FC_downwards[i])
+
+# def E_FC_upwards_rule(m,i):
+#     return(((m.E_dis_FC[i])*m.Inverter_eff),m.E_FC_upwards[i])
+
+###############################
+
 #Energy balance constraints
 
 def Bool_cons_rule_1(m,i):
@@ -260,7 +503,7 @@ def Bool_cons_rule_3(m,i):
     Forbids the system to inject and export energy at the same time 3/5
     '''
     bigM=500000
-    return((m.E_PV_grid[i])>=-bigM*(m.Bool_inj[i]))
+    return((m.E_PV_grid[i]+m.E_dis_FC[i])>=-bigM*(m.Bool_inj[i]))
 
 def Bool_cons_rule_4(m,i):
     '''
@@ -269,7 +512,7 @@ def Bool_cons_rule_4(m,i):
     Forbids the system to inject and export energy at the same time 4/5
     '''
     bigM=500000
-    return((m.E_PV_grid[i])<=0+bigM*(1-m.Bool_cons[i]))
+    return((m.E_PV_grid[i]+m.E_dis_FC[i])<=0+bigM*(1-m.Bool_cons[i]))
 
 def Cons_rule(m,i):
     '''
@@ -279,13 +522,57 @@ def Cons_rule(m,i):
     '''
     return (m.Bool_inj[i]+m.Bool_cons[i],1)
 
+def Bool_inv_rule_1(m,i):
+    '''
+    Description
+    -------
+    Forbids the system to inject and export energy at the same time 1/5
+    '''
+    bigM=500000
+    return((m.E_grid_batt[i]+m.E_grid_batt_FC[i])>=-bigM*(m.Bool_inv_in[i]))
+
+def Bool_inv_rule_2(m,i):
+    '''
+    Description
+    -------
+    Forbids the system to inject and export energy at the same time 2/5
+    '''
+    bigM=500000
+    return((m.E_grid_batt[i]+m.E_grid_batt_FC[i])<=0+bigM*(1-m.Bool_inv_out[i]))
+
+def Bool_inv_rule_3(m,i):
+    '''
+    Description
+    -------
+    Forbids the system to inject and export energy at the same time 3/5
+    '''
+    bigM=500000
+    return((m.E_PV_grid[i]+m.E_PV_load[i]+m.E_dis[i]+m.E_dis_FC[i])>=-bigM*(m.Bool_inv_out[i]))
+
+def Bool_inv_rule_4(m,i):
+    '''
+    Description
+    -------
+    Forbids the system to inject and export energy at the same time 4/5
+    '''
+    bigM=500000
+    return((m.E_PV_grid[i]+m.E_PV_load[i]+m.E_dis[i]+m.E_dis_FC[i])<=0+bigM*(1-m.Bool_inv_in[i]))#cons
+
+def Bool_inv_rule0(m,i):
+    '''
+    Description
+    -------
+    Forbids the system to inject and export energy at the same time 5/5
+    '''
+    return (m.Bool_inv_out[i]+m.Bool_inv_in[i],1)
+
 def Grid_cons_rule(m,i):
     '''
     Description
     -------
     Balance of grid consumption, includes the electricity consumed by the battery, the loads, and losses in the inverter (when charging the battery from the grid),
     '''
-    return(m.E_cons[i],m.E_grid_batt[i]+m.E_grid_load[i]+m.E_loss_inv_grid[i])
+    return(m.E_cons[i],m.E_grid_batt[i]+m.E_grid_batt_FC[i]+m.E_grid_load[i]+m.E_loss_inv_grid[i])
 
 def Balance_PV_rule(m,i):
     '''
@@ -293,8 +580,7 @@ def Balance_PV_rule(m,i):
     -------
     Balance of PV consumption, includes the electricity provided to the battery, the loads, losses in the inverter and the converter. Includes as well curtailed PV.
     '''
-    return (m.E_PV[i],m.E_PV_load[i]+m.E_PV_batt[i]+m.E_PV_grid[i]
-            +m.E_loss_conv[i]+m.E_loss_inv_PV[i]+m.E_PV_curt[i])
+    return (m.E_PV[i],m.E_PV_load[i]+m.E_PV_batt[i]+m.E_PV_batt_FC[i]+m.E_PV_grid[i]+m.E_loss_conv[i]+m.E_loss_inv_PV[i]+m.E_PV_curt[i])
 
 def Sold_rule(m,i):
     '''
@@ -316,8 +602,7 @@ def Balance_load_rule(m,i):
     include the bi-directional inverter energy standby consumption as a function
     of the inverter power
     '''
-    return (m.E_demand[i],m.E_PV_load[i]+m.E_dis[i]*(m.Inverter_eff)
-            +m.E_grid_load[i])#-m.Inverter_power*0.5/100)
+    return (m.E_demand[i],m.E_PV_load[i]+m.E_dis[i]*(m.Inverter_eff)+m.E_grid_load[i])#-m.Inverter_power*0.5/100)
 
 def def_storage_state_rule(m, t):
     '''
@@ -338,7 +623,7 @@ def Conv_losses_rule(m,i):
     -------
     Converter losses definition. 1-Converter_efficiency times the electricity that pass through the converter.
     '''
-    return(m.E_loss_conv[i],((m.E_PV_load[i]+m.E_PV_grid[i]+m.E_PV_batt[i]+m.E_loss_inv_PV[i])*(1-m.Converter_eff)))
+    return(m.E_loss_conv[i],((m.E_PV_load[i]+m.E_PV_grid[i]+m.E_PV_batt[i]+m.E_PV_batt_FC[i]+m.E_loss_inv_PV[i])*(1-m.Converter_eff)))
 
 def Inv_losses_PV_rule(m,i):
     '''
@@ -346,7 +631,7 @@ def Inv_losses_PV_rule(m,i):
     -------
     PV inverter losses definition. 1-Inverter_efficiency times the electricity that pass through the Inverter (takes into account only PV related electricity).
     '''
-    return(m.E_loss_inv_PV[i],(m.E_PV_grid[i]+m.E_PV_load[i])*(1-m.Inverter_eff)/m.Inverter_eff)
+    return(m.E_loss_inv_PV[i],(m.E_PV_grid[i]+m.E_PV_load[i]+m.E_PV_batt_FC[i])*(1-m.Inverter_eff)/m.Inverter_eff)
 
 def Inv_losses_Batt_rule(m,i):
     '''
@@ -355,6 +640,13 @@ def Inv_losses_Batt_rule(m,i):
     Battery inverter losses definition. 1-Inverter_efficiency times the electricity that pass through the Inverter (takes into account only battery related electricity). E_dis is the energy discharged from the battery, thus no need to divide by the inverter efficiency.
     '''
     return(m.E_loss_inv_batt[i],(m.E_dis[i])*(1-m.Inverter_eff))#E_dis is the flow from the battery (before the inverter)
+def Inv_losses_Batt_rule_FC(m,i):
+    '''
+    Description
+    -------
+    Battery inverter losses definition. 1-Inverter_efficiency times the electricity that pass through the Inverter (takes into account only battery related electricity). E_dis is the energy discharged from the battery, thus no need to divide by the inverter efficiency.
+    '''
+    return(m.E_loss_inv_batt_FC[i],(m.E_dis_FC[i])*(1-m.Inverter_eff))#E_dis is the flow from the battery (before the inverter)
 
 def Inv_losses_Grid_rule(m,i):
     '''
@@ -362,8 +654,8 @@ def Inv_losses_Grid_rule(m,i):
     -------
     PV inverter losses definition. 1-Inverter_efficiency times the electricity that pass through the Inverter (takes into account only grid related electricity, i.e. for charging the battery).
     '''
-    return(m.E_loss_inv_grid[i],(m.E_grid_batt[i]/m.Inverter_eff)*(1-m.Inverter_eff))
-
+    return(m.E_loss_inv_grid[i],((m.E_grid_batt_FC[i]+m.E_grid_batt[i])/m.Inverter_eff)*(1-m.Inverter_eff))
+#
 def Inv_losses_rule(m,i):
     '''
     Description
@@ -371,7 +663,7 @@ def Inv_losses_rule(m,i):
     Inverter losses definition. Summation of the PV, battery and grid related losses.
     '''
     return(m.E_loss_inv[i],m.E_loss_inv_grid[i]
-           +m.E_loss_inv_batt[i]+m.E_loss_inv_PV[i])
+           +m.E_loss_inv_batt[i]+m.E_loss_inv_batt_FC[i]+m.E_loss_inv_PV[i])
 
 def Batt_losses_rule(m,i):
     '''
@@ -380,7 +672,14 @@ def Batt_losses_rule(m,i):
     Battery losses definition. 1-Battery_efficiency times the electricity that pass through the battery (roundtrip efficiency).
     '''
     return(m.E_loss_Batt[i],(m.E_grid_batt[i]+m.E_PV_batt[i])*(1-m.Efficiency))
-
+def Batt_losses_rule_FC(m,i):
+    '''
+    Description
+    -------
+    Battery losses definition. 1-Battery_efficiency times the electricity that pass through the battery (roundtrip efficiency).
+    '''
+    return(m.E_loss_Batt_FC[i],(m.E_grid_batt_FC[i]+m.E_PV_batt_FC[i])*(1-m.Efficiency))
+#
 #Power
 
 def Inverter_rule(m,i):
@@ -389,8 +688,7 @@ def Inverter_rule(m,i):
     -------
     Inverter power definition. All electricity flows through the inverter must be lower than the inverter nominal power (including losses).
     '''
-    return(m.E_PV_grid[i]/m.dt+m.E_dis[i]/m.dt+m.E_PV_load[i]/m.dt
-           +m.E_loss_inv[i]/m.dt<=m.Inverter_power)
+    return(m.E_PV_grid[i]/m.dt+m.E_dis[i]/m.dt+m.E_dis_FC[i]/m.dt+m.E_PV_load[i]/m.dt+m.E_loss_inv[i]/m.dt<=m.Inverter_power)
 
 def Converter_rule(m,i):
     '''
@@ -398,8 +696,7 @@ def Converter_rule(m,i):
     -------
     Converter power definition. All electricity flows through the Converter must be lower than the inverter nominal power (including losses).
     '''
-    return(m.E_PV_grid[i]/m.dt+m.E_PV_batt[i]/m.dt+m.E_PV_load[i]/m.dt
-           +m.E_loss_conv[i]/m.dt<=m.Inverter_power)
+    return(m.E_PV_grid[i]/m.dt+m.E_PV_batt_FC[i]/m.dt+m.E_PV_batt[i]/m.dt+m.E_PV_load[i]/m.dt+m.E_loss_conv[i]/m.dt<=m.Inverter_power)
 
 def Inverter_grid_rule(m,i):
     '''
@@ -407,8 +704,8 @@ def Inverter_grid_rule(m,i):
     -------
     Inverter power definition. All electricity flows through the inverter must be lower than the inverter nominal power (including losses). This rule is used for grid charging only.
     '''
-    return(m.E_grid_batt[i]/m.dt+m.E_loss_inv_grid[i]/m.dt<=m.Inverter_power)
-
+    return(m.E_grid_batt[i]/m.dt+m.E_grid_batt_FC[i]/m.dt+m.E_loss_inv_grid[i]/m.dt<=m.Inverter_power)
+#
 def P_max_rule(m,i):
     '''
     Description
@@ -420,11 +717,11 @@ def P_max_rule(m,i):
     #def P_max_rule_grid(m,i):
     return (m.E_PV_grid[i]<=m.P_max_day*m.dt)
     '''
-    return(m.E_cons[i]/m.dt<=m.P_max_day)
+    return(m.E_cons[i]/m.dt<=m.P_max_day)#
 
 
 #def P_max_rule_grid(m,i):
-#    return(m.E_PV_grid[i]/m.dt<=m.P_max_day)
+#    return(m.E_PV_grid[i]/m.dt+m.E_FC_upwards[i]/m.dt<=m.P_max_day)
 
 #App
 
@@ -451,6 +748,7 @@ def PVSC_rule(m,i):
     else:
         return(m.E_grid_batt[i]==0)
 
+
 #Objective
 
 def Obj_fcn(m):
@@ -459,5 +757,8 @@ def Obj_fcn(m):
     -------
     The bill is calculated in two parts, the energy related part is the retail price times the energy consumed from the grid minus the export price times the PV injection. If there is demand peak shaving (a capacity tariff is applied) the maximum power taken from the grid (in kW) is multiplied by the DAILY capacity tariff ($/kW per day).
     '''
-    return(sum((m.retail_price[i]*m.E_cons[i])
-    -(m.export_price[i]*m.E_PV_grid[i]) for i in m.Time))*m.PVSC+(m.P_max_day*m.capacity_tariff)*m.DPS
+    return(sum((m.retail_price[i]*m.E_cons[i])-(m.export_price[i]*(m.E_PV_grid[i]+m.E_dis_FC[i]*m.Inverter_eff)) for i in m.Time)*m.PVSC+((m.P_max_day*m.capacity_tariff)*m.DPS)-sum((m.E_grid_batt_FC[i]*m.FC_price_down[i])+(m.FC_price_up[i]*m.E_dis_FC[i]*m.Inverter_eff)for i in m.Time)*m.FC)
+
+#+(m.FC_price_up[i]*m.E_FC_upwards[i])
+
+#+(m.FC_price_down[i]*m.E_FC_downwards[i])+(m.FC_price_up[i]*m.E_FC_upwards[i]))

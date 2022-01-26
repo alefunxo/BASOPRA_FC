@@ -168,8 +168,8 @@ def Optimize(data_input,param):
             param.update({col:dict(enumerate(data_input_[col]))})
         Set_declare=np.arange(-1,data_input_.shape[0])
         #if i==0:
-        #    print(retail_price_dict)
-            
+#         print(param['FC_price_up'])
+       
         
         param.update({'dayofyear':data_input.index.dayofyear[0]+i,
                       'SOC_max':aux_SOC_max,
@@ -189,15 +189,15 @@ def Optimize(data_input,param):
         if sys.platform=='win32':
             opt = SolverFactory('cplex')
             opt.options["threads"]=1
-            opt.options["mipgap"]=0.001
+            opt.options["mipgap"]=0.05
         else:
             opt = SolverFactory('cplex',executable='/opt/ibm/ILOG/'
                             'CPLEX_Studio1271/cplex/bin/x86-64_linux/cplex')
             opt.options["threads"]=1
-            opt.options["mipgap"]=0.001
-        results = opt.solve(instance)#,tee=True)
+            opt.options["mipgap"]=0.05
+        results = opt.solve(instance,tee=True)
         global_lock.release()
-        #results.write(num=1)
+        results.write(num=1)
 
         if (results.solver.status == SolverStatus.ok) and (results.solver.termination_condition == TerminationCondition.optimal):
 
@@ -205,7 +205,7 @@ def Optimize(data_input,param):
             [df_1,P_max]=Get_output(instance)
             if param['aging']:
                 [SOC_max_,aux_Cap,SOH_aux,Cycle_aging_factor,cycle_cal,DoD]=aging_day(
-                df_1.E_char,SOH,Batt.SOC_min,Batt,aux_Cap_aged)
+                df_1.E_char+df_1.E_char_FC,SOH,Batt.SOC_min,Batt,aux_Cap_aged)
                 DoD_arr[i]=DoD
                 cycle_cal_arr[i]=cycle_cal
                 P_max_arr[i]=P_max
@@ -213,7 +213,7 @@ def Optimize(data_input,param):
                 SOC_max_arr[i]=SOC_max_
                 SOH_arr[i]=SOH_aux
             else:
-                DoD_arr[i]=df_1.E_dis.sum()/Batt.Capacity
+                DoD_arr[i]=(df_1.E_dis+df_1.E_dis_FC).sum()/Batt.Capacity
                 cycle_cal_arr[i]=0
                 P_max_arr[i]=P_max
                 aux_Cap_arr[i]=aux_Cap
@@ -252,22 +252,30 @@ def Optimize(data_input,param):
     df=pd.concat([df,data_input.loc[data_input.index[:end_d],['E_demand','E_PV','Export_price']].reset_index()],axis=1)
     if param['App_comb'][3]==True:#DLS
         if param['App_comb'][4]==True:#DPS
-            print('App2 and App 3')
+            print('DLS and DPS')
             df['price']=data_input.Price_DT_mod.reset_index(drop=True)[:end_d].values
         else:
-            print('App2')
+            print('DLS')
             df['price']=data_input.Price_DT.reset_index(drop=True)[:end_d].values
     else:
         if param['App_comb'][4]==True:
-            print('App3')
+            print('DPS')
             df['price']=data_input.Price_flat_mod.reset_index(drop=True)[:end_d].values
         else:
-            print('No app2 nor 3')
+            print('No DLS nor DPS')
             df['price']=data_input.Price_flat.reset_index(drop=True)[:end_d].values
-
-    df['Inv_P']=((df.E_PV_load+df.E_dis+df.E_PV_grid+df.E_loss_inv)/dt)
-    df['Conv_P']=((df.E_PV_load+df.E_PV_batt+df.E_PV_grid
+    if param['App_comb'][0]==True:#FC
+            print('FC')
+            df['FC_price_down']=data_input.FC_price_down.reset_index(drop=True)[:end_d].values
+            df['FC_price_up']=data_input.FC_price_up.reset_index(drop=True)[:end_d].values
+            #df['FC_activation_up']=data_input.FC_activation_up.reset_index(drop=True)[:end_d].values
+            #df['FC_activation_down']=data_input.FC_activation_down.reset_index(drop=True)[:end_d].values
+    
+    df['Inv_P']=((df.E_PV_load+df.E_dis+df.E_PV_grid+df.E_loss_inv+df.E_dis_FC)/dt)
+    
+    df['Conv_P']=((df.E_PV_load+df.E_PV_batt+df.E_PV_grid+df.E_PV_batt_FC
                   +df.E_loss_conv)/dt)
+    
     print(df.head())
     df.set_index('index',inplace=True)
     print('bf aux_dict')
@@ -469,7 +477,7 @@ def save_results(df,aux_dict,param):
         col2 = ["%i" % x for x in param['conf']]
         name_conf=col2[0]+col2[1]+col2[2]+col2[3]
         print('after')
-        filename_save=('../Output/df_%(name)s_%(Tech)s_%(App_comb)s_%(Cap)s_%(conf)s_%(Scenario)s.csv'%{'name':param['name'],'Tech':param['Tech'],'App_comb':name_comb,'Cap':int(param['Capacity']),'conf':name_conf,'Scenario':param['Scenario']})
+        filename_save=('../../Output/df_%(name)s_%(Tech)s_%(App_comb)s_%(Cap)s_%(conf)s_%(Scenario)s.csv'%{'name':param['name'],'Tech':param['Tech'],'App_comb':name_comb,'Cap':int(param['Capacity']),'conf':name_conf,'Scenario':param['Scenario']})
         df.to_csv(filename_save)
         print('df_saved')
         save_obj(aux_dict, 'aux_dict' )
@@ -482,7 +490,7 @@ def save_results(df,aux_dict,param):
         return
 
 def save_obj(obj, name ):
-    with open('../Output/'+ name + '.pkl', 'wb') as f:
+    with open('../../Output/'+ name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 
@@ -513,12 +521,13 @@ def single_opt2(param, data_input):
     df,aux_dict=Optimize(data_input,param)
     param.update({'App_comb':aux_app_comb})
     print('enter to save')
-    #save_results(df,aux_dict,param)
+    save_results(df,aux_dict,param)
     if param['testing']==False:
         print('enter to agg')
         aggregate_results(df,aux_dict,param)
     else:
         print(data_input.head())
+        save_results(df,aux_dict,param)
     print('so3')
     return  [df,aux_dict]
 

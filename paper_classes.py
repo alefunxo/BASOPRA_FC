@@ -199,8 +199,8 @@ class Battery_case(Battery_tech): #Based on Schmidt et al. (2019)
                 'Price_battery': 335*self.Capacity*self.EUR_USD,
                 'Battery_cal_life': 15,
                 'Battery_cycle_life': 4996,
-                'SOC_max': 0.965*self.Capacity,
-                'SOC_min': 0.035*self.Capacity}
+                'SOC_max': self.Capacity,#0.965*self.Capacity,
+                'SOC_min': 0}#0.035*self.Capacity}
                 for key, val in defaults.items():
                     setattr(self, key, val)
                 self.__dict__.update(kwargs)
