@@ -113,6 +113,7 @@ def Concrete_model(Data):
     m.E_grid_batt=en.Var(m.Time,bounds=(0,m.Batt_char_max*m.dt),
                        initialize=0)
     
+    #m.finalEnergyStoredValuation = en.Param(initialize = m.SOC_max_FC/2, mutable = True)
     #m.E_PV_FC=en.Var(m.Time,bounds=(0,None),initialize=0)
     #m.E_FC_load=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_PV_batt_FC=en.Var(m.Time,bounds=(0,m.Batt_char_max_FC*m.dt),initialize=0)
@@ -138,14 +139,14 @@ def Concrete_model(Data):
     m.P_max_day=en.Var(initialize=0)
     
     m.SOC=en.Var(m.tm,bounds=(m.SOC_min,m.SOC_max),initialize=m.SOC_min)
-    m.SOC_FC=en.Var(m.tm,bounds=(m.SOC_min,m.SOC_max_FC),initialize=m.SOC_min)
+    m.SOC_FC=en.Var(m.tm,bounds=(m.SOC_min,m.SOC_max_FC),initialize=m.SOC_max_FC/2)
     m.E_loss_inv_batt_FC=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_loss_conv=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_loss_inv=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_loss_inv_PV=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_loss_inv_batt=en.Var(m.Time,bounds=(0,None),initialize=0)
     m.E_loss_inv_grid=en.Var(m.Time,bounds=(0,None),initialize=0)
-    
+    #m.finalSOCmin=en.Var(initialize=m.SOC_max_FC/2)
     #Objective Function
 
     m.total_cost = en.Objective(rule=Obj_fcn,sense=en.minimize)
@@ -215,6 +216,7 @@ def Concrete_model(Data):
     m.Balance_batt_FC=en.Constraint(m.Time,rule=Balance_Batt_rule_FC)
     m.E_char_r_FC=en.Constraint(m.Time,rule=E_char_rule_FC)
     m.E_dis_r_FC=en.Constraint(m.Time,rule=E_dis_rule_FC)
+    #m.final_SOC_minimum_r=en.Constraint(m.Time,rule=final_SOC_minimum_rule)
 #     m.FC_ch1=en.Constraint(m.Time,rule=Bool_cons_rule_1_FC)
 #     m.FC_ch2=en.Constraint(m.Time,rule=Bool_cons_rule_2_FC)
 #     m.FC_ch3=en.Constraint(m.Time,rule=Bool_cons_rule_3_FC)
@@ -226,7 +228,11 @@ def Concrete_model(Data):
 
 #Instance
 #Energy
-
+def final_SOC_minimum_rule(m,i):
+    '''
+    Constraint on the final SOC at the end of the period.
+    '''
+    return(m.SOC_FC[-1]>= m.SOC_max_FC/2)
 #Battery constraints (not for FC)
 def Bool_char_rule_1(m,i):
     '''
@@ -461,7 +467,7 @@ def def_storage_state_rule_FC(m, t):
     State of charge definition as the previous SOC plus charged electricity minus losses minus discharged electricity. Stablishes as well the initial SOC at SOC_min
     '''
     if t==-1:
-        return(m.SOC_FC[t],m.SOC_min)
+        return(m.SOC_FC[t],m.SOC_max_FC/2)
     else:
         return (m.SOC_FC[t] ==m.SOC_FC[t-1]+m.E_char_FC[t]-m.E_dis_FC[t]-m.E_loss_Batt_FC[t])
 
@@ -757,7 +763,7 @@ def Obj_fcn(m):
     -------
     The bill is calculated in two parts, the energy related part is the retail price times the energy consumed from the grid minus the export price times the PV injection. If there is demand peak shaving (a capacity tariff is applied) the maximum power taken from the grid (in kW) is multiplied by the DAILY capacity tariff ($/kW per day).
     '''
-    return(sum((m.retail_price[i]*m.E_cons[i])-(m.export_price[i]*(m.E_PV_grid[i]+m.E_dis_FC[i]*m.Inverter_eff)) for i in m.Time)*m.PVSC+((m.P_max_day*m.capacity_tariff)*m.DPS)-sum((m.E_grid_batt_FC[i]*m.FC_price_down[i])+(m.FC_price_up[i]*m.E_dis_FC[i]*m.Inverter_eff)for i in m.Time)*m.FC)
+    return(sum((m.retail_price[i]*m.E_cons[i])-(m.export_price[i]*(m.E_PV_grid[i]+m.E_dis_FC[i]*m.Inverter_eff)) for i in m.Time)*m.PVSC+((m.P_max_day*m.capacity_tariff)*m.DPS)-sum((m.E_grid_batt_FC[i]*m.FC_price_down[i])+(m.FC_price_up[i]*m.E_dis_FC[i]*m.Inverter_eff)for i in m.Time)*m.FC)#+ m.SOC_FC[-1]
 
 #+(m.FC_price_up[i]*m.E_FC_upwards[i])
 

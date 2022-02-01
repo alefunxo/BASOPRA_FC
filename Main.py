@@ -267,8 +267,8 @@ def main():
        'SOC_max', 'SOC_min', 'DoD_mean', 'DoD_max', 'DoD_min', 'last_cap',
        'cap_fading', 'last_SOH', 'P_max_year_batt', 'P_max_year_nbatt',
        'P_drained_max', 'P_injected_max', 'App_comb', 'Capacity', 'Tech',
-       'PV_nom', 'name', 'cluster', 'country', 'quartile', 'results_PVbatt',
-       'results_PV', 'results','results_FC', 'EFC_nolifetime', 'LS', 'TSC', 'DSC', 'ISC',
+       'PV_nom', 'name', 'cluster', 'country', 'quartile', 'PVBatt','PVBattNoFC'
+       'PV', 'Base','FC', 'EFC_nolifetime', 'LS', 'TSC', 'DSC', 'ISC',
        'CU', 'PS_year', 'BS', 'cycle_to_total', 'cases', 'Scenario', 'FC_div']
                 writer = csv.writer(f, delimiter=';')
                 writer.writerow(columns)
@@ -298,7 +298,7 @@ def main():
             Combs_todo=Combs_todo[0]
         print(len(Combs_todo))
         mp.freeze_support()
-        pool=mp.Pool(processes=1)
+        pool=mp.Pool(processes=15)
         #selected_dwellings=select_data(Combs_todo)
         #print(selected_dwellings)
         #print(Combs_todo)

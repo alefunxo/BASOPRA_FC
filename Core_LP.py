@@ -524,7 +524,7 @@ def single_opt2(param, data_input):
     df,aux_dict=Optimize(data_input,param)
     param.update({'App_comb':aux_app_comb})
     print('enter to save')
-    #save_results(df,aux_dict,param)
+    save_results(df,aux_dict,param)
     if param['testing']==False:
         print('enter to agg')
         aggregate_results(df,aux_dict,param)
