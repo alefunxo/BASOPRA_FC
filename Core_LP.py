@@ -189,19 +189,22 @@ def Optimize(data_input,param):
         if sys.platform=='win32':
             opt = SolverFactory('cplex')
             opt.options["threads"]=1
-            opt.options["mipgap"]=0.05
+            opt.options["mipgap"]=0.01
+            opt.options["TimeLimit"] = 30
         else:
             opt = SolverFactory('cplex',executable='/opt/ibm/ILOG/'
                             'CPLEX_Studio1271/cplex/bin/x86-64_linux/cplex')
             opt.options["threads"]=1
-            opt.options["mipgap"]=0.05
+            opt.options["mipgap"]=0.01
+            opt.options["TimeLimit"] = 30
         results = opt.solve(instance,tee=True)
         global_lock.release()
-        results.write(num=1)
+        #results.write(num=1)
 
-        if (results.solver.status == SolverStatus.ok) and (results.solver.termination_condition == TerminationCondition.optimal):
+        if (results.solver.status == SolverStatus.ok) :#and (results.solver.termination_condition == TerminationCondition.optimal):#if more than 30s then it is not optimal, but still useful
 
         # Do something when the solution is optimal and feasible
+            print('enter normally')
             [df_1,P_max]=Get_output(instance)
             if param['aging']:
                 [SOC_max_,aux_Cap,SOH_aux,Cycle_aging_factor,cycle_cal,DoD]=aging_day(
@@ -241,12 +244,12 @@ def Optimize(data_input,param):
         elif (results.solver.termination_condition == TerminationCondition.infeasible):
             results.write(num=1)
             # Do something when model is infeasible
-            #print('Termination condition',results.solver.termination_condition)
+            print('Termination condition',results.solver.termination_condition)
             return (None,None,None,None,None,None,None,None,results)
         else:
             results.write(num=1)
             # Something else is wrong
-            #print ('Solver Status: ',  results.solver.status)
+            print ('Solver Status is here: ',  results.solver.status)
             return (None,None,None,None,None,None,None,None,results)
     end_d=df.shape[0]
     df=pd.concat([df,data_input.loc[data_input.index[:end_d],['E_demand','E_PV','Export_price']].reset_index()],axis=1)
@@ -425,7 +428,7 @@ def aggregate_results(df,aux_dict,param):
             continue
         global_lock.acquire()
         #Should be saved in a DB
-        filename='../../Output/aggregated_results.csv'
+        filename='/data/home/alejandropena/P4/Sept_2021/Output/aggregated_results.csv'
         print('Inside agg_results')
         with open(filename, 'a', newline='') as f:
             writer = csv.writer(f, delimiter=';')
@@ -477,7 +480,7 @@ def save_results(df,aux_dict,param):
         col2 = ["%i" % x for x in param['conf']]
         name_conf=col2[0]+col2[1]+col2[2]+col2[3]
         print('after')
-        filename_save=('../../Output/df_%(name)s_%(Tech)s_%(App_comb)s_%(Cap)s_%(conf)s_%(Scenario)s.csv'%{'name':param['name'],'Tech':param['Tech'],'App_comb':name_comb,'Cap':int(param['Capacity']),'conf':name_conf,'Scenario':param['Scenario']})
+        filename_save=('/data/home/alejandropena/P4/Sept_2021/Output/df_%(name)s_%(Tech)s_%(App_comb)s_%(Cap)s_%(conf)s_%(FC_div)s.csv'%{'name':param['name'],'Tech':param['Tech'],'App_comb':name_comb,'Cap':int(param['Capacity']),'conf':name_conf,'FC_div':param['FC_div']})
         df.to_csv(filename_save)
         print('df_saved')
         save_obj(aux_dict, 'aux_dict' )
@@ -490,7 +493,7 @@ def save_results(df,aux_dict,param):
         return
 
 def save_obj(obj, name ):
-    with open('../../Output/'+ name + '.pkl', 'wb') as f:
+    with open('/data/home/alejandropena/P4/Sept_2021/Output/'+ name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 
@@ -521,7 +524,7 @@ def single_opt2(param, data_input):
     df,aux_dict=Optimize(data_input,param)
     param.update({'App_comb':aux_app_comb})
     print('enter to save')
-    save_results(df,aux_dict,param)
+    #save_results(df,aux_dict,param)
     if param['testing']==False:
         print('enter to agg')
         aggregate_results(df,aux_dict,param)
