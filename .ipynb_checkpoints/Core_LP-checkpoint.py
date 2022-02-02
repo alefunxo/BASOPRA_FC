@@ -197,14 +197,14 @@ def Optimize(data_input,param):
             opt.options["threads"]=1
             opt.options["mipgap"]=0.01
             opt.options["TimeLimit"] = 30
-        results = opt.solve(instance,tee=True)
+        results = opt.solve(instance)#,tee=True)
         global_lock.release()
         #results.write(num=1)
 
         if (results.solver.status == SolverStatus.ok) :#and (results.solver.termination_condition == TerminationCondition.optimal):#if more than 30s then it is not optimal, but still useful
 
         # Do something when the solution is optimal and feasible
-            print('enter normally')
+            
             [df_1,P_max]=Get_output(instance)
             if param['aging']:
                 [SOC_max_,aux_Cap,SOH_aux,Cycle_aging_factor,cycle_cal,DoD]=aging_day(
@@ -407,13 +407,15 @@ def aggregate_results(df,aux_dict,param):
     print('agg1')
     try:
         param.update({'df':df})
-
+        
         param = Merge(param, aux_dict)
         param['DoD'] = param.pop('DoD_arr')
         param['Cap_arr']=param.pop('aux_Cap_arr')
         param['SOH']=param.pop('SOH_arr')
         param['P_max']=param.pop('P_max_arr')
         param['results']=param.pop('results_arr')
+        
+        print('results sum: {}'.format(sum(param['results'])))
         App_comb=param['App_comb']
         col = ["%i" % x for x in App_comb]
         name_comb=col[0]+col[1]+col[2]+col[3]+col[4]
@@ -421,8 +423,9 @@ def aggregate_results(df,aux_dict,param):
 
         name_conf=col2[0]+col2[1]+col2[2]+col2[3]
         [clusters,PV,App]=pp.get_table_inputs()
+        
         [agg_results]=pp.get_main_results(param,clusters,PV,App)
-        print(agg_results.head())
+        print(agg_results.keys())
         global_lock = threading.Lock()
         while global_lock.locked():
             continue

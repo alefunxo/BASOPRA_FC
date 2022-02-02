@@ -130,7 +130,7 @@ def get_table_inputs2():
     return[clusters,PV,App_comb]
 
 def get_prices_FC(country,App_comb,PV_nom,df_base,df_batt,dt,curtailment):
-    print("FC Prices")
+
     
     if country=='US':
         Capacity_tariff=10.14
@@ -158,10 +158,10 @@ def get_prices_FC(country,App_comb,PV_nom,df_base,df_batt,dt,curtailment):
         bill_power_batt=P_max_month_batt*Capacity_tariff
 
 
-
+    
     bill_energy_min_PV=df_base.rem_load*df_base.price
     bill_energy_day_PV=bill_energy_min_PV.groupby([df_base.index.month, df_base.index.day]).sum()
-
+    
     bill_energy_min=df_base.E_demand*df_base.price
     bill_energy_day=bill_energy_min.groupby([df_base.index.month, df_base.index.day]).sum()
 
@@ -175,16 +175,20 @@ def get_prices_FC(country,App_comb,PV_nom,df_base,df_batt,dt,curtailment):
     bill_PV=(bill_PV.unstack().sum(axis=1)+bill_power_PV).reset_index(drop=True)
     bill_batt=(bill_batt.unstack().sum(axis=1)+bill_power_batt).reset_index(drop=True)
     if App_comb[0]:
-        exported_energy_day_batt=exported_energy_day_batt+df_batt.E_dis_FC*0.95#inv eff
-        bill_batt=(df_batt.E_cons*df_batt.price-exported_energy_day_batt).groupby([df_batt.index.month, df_base.index.day]).sum()
-        bill_batt=(bill_batt.unstack().sum(axis=1)+bill_power_batt).reset_index(drop=True)
-        bill_FC=df_batt.E_grid_batt_FC*df_batt.FC_price_down+df_batt.FC_price_up*df_batt.E_dis_FC*0.95
-        bill_FC=bill_FC.groupby([df_batt.index.month, df_base.index.day]).sum().unstack().sum(axis=1).reset_index(drop=True)
-        print(bill_batt)
-        print(bill_FC)
-        bill_batt=bill_batt-bill_FC
-        print(bill_batt)
-    return [bill,bill_PV,bill_batt,bill_FC]
+        print("FC Prices")
+        
+        bill_batt_mod=((df_batt.price*df_batt.E_cons)-(df_batt.Export_price*(df_batt.E_PV_grid+df_batt.E_dis_FC*0.95))).groupby([df_batt.index.month, df_batt.index.day]).sum()
+        print("d")
+        print(bill_batt_mod.sum())
+        bill_batt_mod=(bill_batt_mod.unstack().sum(axis=1)+bill_power_batt).reset_index(drop=True)
+        print("e")
+        bill_FCn=df_batt.E_grid_batt_FC*df_batt.FC_price_down
+        bill_FCp=df_batt.FC_price_up*df_batt.E_dis_FC*0.95
+        bill_FCn=bill_FCn.groupby([df_batt.index.month, df_batt.index.day]).sum().unstack().sum(axis=1).reset_index(drop=True)
+        bill_FCp=bill_FCp.groupby([df_batt.index.month, df_batt.index.day]).sum().unstack().sum(axis=1).reset_index(drop=True)
+        bill_tot=bill_batt_mod-bill_FCp-bill_FCn
+        print(bill_tot.sum())
+    return [bill,bill_PV,bill_tot,bill_FCp,bill_FCn,bill_batt]
 def get_base_prices(country,App_comb,PV_nom,df_base,df_batt,dt,curtailment):
     print("Base Prices")
     
@@ -268,7 +272,7 @@ def get_main_results(dict_res,clusters,PV,App):
     agg_results['P_max_year_batt']=dict_res['P_max'].max()
     agg_results['P_max_year_nbatt']=df['E_demand'].max()/dt
     agg_results['P_drained_max']=df['E_cons'].max()/dt
-    agg_results['P_injected_max']=df['E_PV_grid'].max()/dt
+    agg_results['P_injected_max']=df.loc[:,['E_PV_grid','E_batt_FC']].sum(axis=1).max()/dt
     
     if isinstance(dict_res['App_comb'], np.ndarray):
         print('is np')
@@ -294,27 +298,29 @@ def get_main_results(dict_res,clusters,PV,App):
                (PV.country==dict_res['name'].split('_')[1])].quartile.values
    
     df_base=df.loc[:,['E_demand','E_PV','Export_price','price']]
-    [base_bill,base_bill_PV,bill_batt,bill_FC]=get_prices_FC(dict_res['name'].split('_')[1],dict_res['App_comb'],dict_res['PV_nom'],df_base,df,dt,curtailment)
+    [base_bill,base_bill_PV,bill_batt,bill_FCp,bill_FCn,bill_battNoFC]=get_prices_FC(dict_res['name'].split('_')[1],dict_res['App_comb'],dict_res['PV_nom'],df_base,df,dt,curtailment)
     #[base_bill,base_bill_PV,bill_batt]=get_prices_FC(dict_res['name'].split('_')[1],dict_res['App_comb'],dict_res['PV_nom'],df_base,df.loc[:,['E_PV_grid','E_cons','price','Export_price']],dt,curtailment)
 
-    agg_results['results_PVbatt']=bill_batt.sum()
-    agg_results['results_PV']=base_bill_PV.sum()
-    agg_results['results']=base_bill.sum()
-    agg_results['results_FC']=bill_FC.sum()
+    agg_results['BillTotal']=bill_batt.sum()
+    agg_results['BillPVBattNoFC']=bill_battNoFC.sum()
+    agg_results['BillPV']=base_bill_PV.sum()
+    agg_results['BillBase']=base_bill.sum()
     
-    sum_results=df.groupby([df.index.month]).sum().reset_index(drop=True)
+    agg_results['BillFCp']=bill_FCp.sum()
+    agg_results['BillFCn']=bill_FCn.sum()
+    agg_results['outResults']=sum(dict_res['results'])
     if dict_res['name'].split('_')[1]=='CH':
         date=pd.date_range(start='2017-01-01 00:00:00',end='2017-12-31 23:50:00',freq='1d',tz='Europe/Brussels')
     else:
         date=pd.date_range(start='2017-01-01 00:00:00',end='2017-12-31 23:50:00',freq='1d',tz='US/Central')
-    print('bf')    
+    print('bf')
     aux=pd.DataFrame(np.vstack((dict_res['results'],dict_res['P_max'],
                             dict_res['DoD'],dict_res['cycle_cal_arr'])).T,
                             columns=['results_PVbatt','P_max','DoD',
                             'cycle_cal_arr']).set_index(date)
-    print('af')
-    agg_results['EFC_nolifetime']=(agg_results.E_dis)/dict_res['Capacity']
-    
+  
+    agg_results['EFC_nolifetime']=(agg_results.E_dis+agg_results.E_dis_FC)/dict_res['Capacity']
+    print('a1')
     if (App_==0) or (App_==1) or (App_==4) or (App_==5):
         agg_results['LS']=0
     else:
@@ -331,10 +337,14 @@ def get_main_results(dict_res,clusters,PV,App):
             rem=df.E_demand[df.price==df.price.max()].groupby(
                     df.E_demand[df.price==df.price.max()].index.month).sum().reset_index(drop=True)
         agg_results['LS']=(1-cons.sum()/rem.sum())*100
+    print('a2')
     agg_results['TSC']=(agg_results.E_PV_load+agg_results.E_PV_batt)/agg_results.E_PV*100#[%]
     agg_results['DSC']=(agg_results.E_PV_load)/agg_results.E_PV*100#[%]
     agg_results['ISC']=(agg_results.E_PV_batt)/agg_results.E_PV*100#[%]
     agg_results['CU']=(agg_results.E_PV_curt)/agg_results.E_PV*100#[%]
+    print('a3')
+    agg_results['FC_PV']=(agg_results.E_PV_batt_FC)/agg_results.E_PV*100#[%]
+    print('a4')
     if (App_==0) or (App_==2) or (App_==4) or (App_==6):
         agg_results['PS_year']=0
     else:
@@ -344,11 +354,15 @@ def get_main_results(dict_res,clusters,PV,App):
     agg_results['BS']=(agg_results.E_dis)/agg_results.E_demand*100#[%]
     agg_results['cycle_to_total']=dict_res['cycle_cal_arr'].sum()/len(dict_res['results'])
     agg_results['cases']=dict_res['cases']
-    print(dict_res.keys())
+
     agg_results['Scenario']=dict_res['Scenario']
+
     agg_results['price']=agg_results['price']
+
     agg_results['Export_price']=agg_results['Export_price']
+  
     agg_results['FC_div']=dict_res['FC_div']
+   
                                   
     #print(agg_results)
     return[agg_results]
